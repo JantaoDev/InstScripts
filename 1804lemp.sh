@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 echo '----------------------------------'
 echo ' Install scripts for Ubuntu 18.04 '
 echo '----------------------------------'
@@ -40,7 +41,7 @@ case $opt in
         apt-get -y install php-gd php-curl php-pear php-mbstring
         # Change configuration
         read -p "Enter POST size (example 8M): " postsize
-        read -p "Enter timezone (example Europe/Minsk): " timezone
+        read -p "Enter timezone (example Europe\/Minsk): " timezone
         # Change PHP configuration file
         sed -r -i "s/;?cgi.fix_pathinfo\s*=\s*[0-9]+/cgi.fix_pathinfo=0/" /etc/php/7.2/fpm/php.ini
         sed -r -i "s/;?post_max_size\s*=\s*\S+/post_max_size=$postsize/" /etc/php/7.2/fpm/php.ini
@@ -79,7 +80,7 @@ case $opt in
         # Copy SSH key from root to user
         read -p "Are you want to copy SSH key from root to $webuser?" -n 1 -r
         echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]
+        if [[ $REPLY =~ ^[Yy]$ ]]
         then
             mkdir /home/$webuser/.ssh
             cp ~/.ssh/authorized_keys /home/$webuser/.ssh/authorized_keys
@@ -108,7 +109,7 @@ case $opt in
         echo "server {" > /etc/nginx/sites-available/$sitename
         read -p "Are you want to set site as default" -n 1 -r
         echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]
+        if [[ $REPLY =~ ^[Yy]$ ]]
         then
             echo "        listen 80 default_server;" >> /etc/nginx/sites-available/$sitename
             echo "        listen [::]:80 default_server;" >> /etc/nginx/sites-available/$sitename
