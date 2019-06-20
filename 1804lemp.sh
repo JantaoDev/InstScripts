@@ -41,7 +41,7 @@ case $opt in
         apt-get -y install php-gd php-curl php-pear php-mbstring
         # Change configuration
         read -p "Enter POST size (example 8M): " postsize
-        read -p "Enter timezone (example Europe\/Minsk): " timezone
+        read -p "Enter timezone (example Europe\\\\/Minsk): " timezone
         # Change PHP configuration file
         sed -r -i "s/;?cgi.fix_pathinfo\s*=\s*[0-9]+/cgi.fix_pathinfo=0/" /etc/php/7.2/fpm/php.ini
         sed -r -i "s/;?post_max_size\s*=\s*\S+/post_max_size=$postsize/" /etc/php/7.2/fpm/php.ini
