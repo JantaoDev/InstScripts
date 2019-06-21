@@ -8,6 +8,9 @@ echo '2) Enable UFW firewall'
 echo '3) Install LEMP'
 echo '4) Create dedicated user for web-server'
 echo '5) Create Symfony site'
+echo '6) Install MTA'
+echo '7) Install munin & monit'
+echo '8) Disable root user and secure SSH'
 echo '0) Quit'
 echo 
 read -p 'What you want? ' opt
@@ -18,7 +21,7 @@ case $opt in
         apt-get update
         apt-get -y upgrade
         echo '----------------------------------'
-        echo ' Done'
+        echo ' Done, please reboot the server'
         echo '----------------------------------'
         ;;
     2)
@@ -28,7 +31,7 @@ case $opt in
         ufw allow OpenSSH
         ufw enable
         echo '----------------------------------'
-        echo ' Done'
+        echo ' Done, please logout and login'
         echo '----------------------------------'
         ;;
     3)
@@ -142,6 +145,159 @@ case $opt in
         echo '----------------------------------'
         echo ' Done'
         echo '----------------------------------'
+        ;;
+    6)
+        echo "Select the configuration \"Internet Site\" during installation"
+        echo "Then write the site domain"
+        echo "(if the mail server is not on this server, it is better to write a subdomain, because it will add the domain to localhost and will not send e-mail to the mail server)"
+        echo ""
+        echo "Press any key..."
+        read -n 1
+        apt-get -y install postfix mailutils
+        read -p "Enter root emails (comma-separated)" emails
+        echo "postmaster: root" >> /etc/aliases
+        echo "root: $emails" >> /etc/aliases
+        newaliases
+        read -p "Are you want to send test e-mails to $emails?" -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]
+        then
+            echo "Test e-mail" | mail -s "Test message from my VPS" root
+        fi
+        echo '----------------------------------'
+        echo ' Done'
+        echo '----------------------------------'
+        ;;
+    7)
+        apt-get -y install munin munin-node
+        read -p "Enter server name (domain) for munin: " servname
+        sed -r -i "s/\[localhost\.localdomain\]/[$servname]/" /etc/munin/munin.conf
+        apt-get -y install monit apache2-utils
+        sed -r -i "s/#?\s+with\s+start\s+delay\s+[0-9]+\s+.+/    with start delay 240/" /etc/monit/monitrc
+        read -p "Enter e-mail for monit: " frommonit
+        read -p "Enter username (to sign in monit and munin): " usermonit
+        read -p "Enter password (to sign in monit and munin): " passmonit
+        echo "set mailserver localhost" > /etc/monit/conf.d/system-services
+        echo "" >> /etc/monit/conf.d/system-services
+        echo "set mail-format {" >> /etc/monit/conf.d/system-services
+        echo "    from: $frommonit" >> /etc/monit/conf.d/system-services
+        echo "    subject: monit alert -- \$EVENT \$SERVICE" >> /etc/monit/conf.d/system-services
+        echo "    message: \$EVENT Service \$SERVICE" >> /etc/monit/conf.d/system-services
+        echo "    Date: \$DATE" >> /etc/monit/conf.d/system-services
+        echo "    Action: \$ACTION" >> /etc/monit/conf.d/system-services
+        echo "    Host: \$HOST" >> /etc/monit/conf.d/system-services
+        echo "    Description: \$DESCRIPTION" >> /etc/monit/conf.d/system-services
+        echo "" >> /etc/monit/conf.d/system-services
+        echo "    Your faithful employee," >> /etc/monit/conf.d/system-services
+        echo "    Monit" >> /etc/monit/conf.d/system-services
+        echo "}" >> /etc/monit/conf.d/system-services
+        echo "" >> /etc/monit/conf.d/system-services
+        echo "set alert root@localhost" >> /etc/monit/conf.d/system-services
+        echo "" >> /etc/monit/conf.d/system-services
+        echo "set httpd port 2812 and" >> /etc/monit/conf.d/system-services
+        echo "    use address localhost" >> /etc/monit/conf.d/system-services
+        echo "    allow localhost" >> /etc/monit/conf.d/system-services
+        echo "    allow $usermonit:\"$passmonit\"" >> /etc/monit/conf.d/system-services
+        echo "" >> /etc/monit/conf.d/system-services
+        echo "check system 1.1.1.1" >> /etc/monit/conf.d/system-services
+        echo "    if loadavg (1min) > 4 then alert" >> /etc/monit/conf.d/system-services
+        echo "    if loadavg (5min) > 2 then alert" >> /etc/monit/conf.d/system-services
+        echo "    if cpu usage > 95% for 10 cycles then alert" >> /etc/monit/conf.d/system-services
+        echo "    if memory usage > 75% then alert" >> /etc/monit/conf.d/system-services
+        echo "    if swap usage > 25% then alert" >> /etc/monit/conf.d/system-services
+        echo "" >> /etc/monit/conf.d/system-services
+        echo "check filesystem rootfs with path /" >> /etc/monit/conf.d/system-services
+        echo "    if space usage > 80% then alert" >> /etc/monit/conf.d/system-services
+        
+        echo "check process nginx with pidfile /var/run/nginx.pid" > /etc/monit/conf.d/lemp-services
+        echo "    group www-data" >> /etc/monit/conf.d/lemp-services
+        echo "    start program = \"/etc/init.d/nginx start\"" >> /etc/monit/conf.d/lemp-services
+        echo "    stop program = \"/etc/init.d/nginx stop\"" >> /etc/monit/conf.d/lemp-services
+        echo "    if failed host localhost port 80 protocol http then restart" >> /etc/monit/conf.d/lemp-services
+        echo "    if 5 restarts within 5 cycles then timeout" >> /etc/monit/conf.d/lemp-services
+        echo "" >> /etc/monit/conf.d/lemp-services
+        echo "check process mysql with pidfile /var/run/mysqld/mysqld.pid" >> /etc/monit/conf.d/lemp-services
+        echo "    start program = \"/etc/init.d/mysql start\"" >> /etc/monit/conf.d/lemp-services
+        echo "    stop program = \"/etc/init.d/mysql stop\"" >> /etc/monit/conf.d/lemp-services
+        echo "    if failed unixsocket /var/run/mysqld/mysqld.sock then restart" >> /etc/monit/conf.d/lemp-services
+        echo "    if 5 restarts within 5 cycles then timeout" >> /etc/monit/conf.d/lemp-services
+        echo "" >> /etc/monit/conf.d/lemp-services
+        echo "check process php7.2-fpm with pidfile /run/php/php7.2-fpm.pid" >> /etc/monit/conf.d/lemp-services
+        echo "    start program = \"/etc/init.d/php7.2-fpm start\"" >> /etc/monit/conf.d/lemp-services
+        echo "    stop program = \"/etc/init.d/php7.2-fpm stop\"" >> /etc/monit/conf.d/lemp-services
+        echo "    if failed unixsocket /run/php/php7.2-fpm.sock then restart" >> /etc/monit/conf.d/lemp-services
+        echo "    if 5 restarts within 5 cycles then timeout" >> /etc/monit/conf.d/lemp-services
+        
+        htpasswd -mbc /etc/munin/.passwd $usermonit "$passmonit"
+        # Add nginx configuration
+        echo "server {" > /etc/nginx/sites-available/munin
+        read -p "Are you want to set munin and monit as default" -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]
+        then
+            echo "        listen 80 default_server;" >> /etc/nginx/sites-available/monit
+            echo "        listen [::]:80 default_server;" >> /etc/nginx/sites-available/monit
+            rm /etc/nginx/sites-enabled/default
+        else
+            echo "        listen 80;" >> /etc/nginx/sites-available/monit
+            echo "        listen [::]:80;" >> /etc/nginx/sites-available/monit
+            read -p "Enter domain (admin.example.com): " sitedomain
+            echo "        server_name $sitedomain;" >> /etc/nginx/sites-available/monit
+        fi
+        echo "        location /munin {" >> /etc/nginx/sites-available/monit
+        echo "              alias /var/cache/munin/www;" >> /etc/nginx/sites-available/monit
+        echo "              autoindex on;" >> /etc/nginx/sites-available/monit
+        echo "              auth_basic "Munin Statistics";" >> /etc/nginx/sites-available/monit
+        echo "              auth_basic_user_file /etc/munin/.passwd;" >> /etc/nginx/sites-available/monit
+        echo "        }" >> /etc/nginx/sites-available/monit
+        echo "        location /monit/ {" >> /etc/nginx/sites-available/monit
+        echo "              rewrite ^/monit/(.*) /\$1 break;" >> /etc/nginx/sites-available/monit
+        echo "              # proxy_ignore_client_abort on;" >> /etc/nginx/sites-available/monit
+        echo "              proxy_pass http://127.0.0.1:2812;" >> /etc/nginx/sites-available/monit
+        echo "              proxy_set_header Host \$host;" >> /etc/nginx/sites-available/monit
+        echo "        }" >> /etc/nginx/sites-available/monit
+        echo "        location / {" >> /etc/nginx/sites-available/monit
+        echo "                return 404;" >> /etc/nginx/sites-available/monit
+        echo "        }" >> /etc/nginx/sites-available/monit
+        echo "}" >> /etc/nginx/sites-available/monit
+        ln -s /etc/nginx/sites-available/monit /etc/nginx/sites-enabled/monit
+        echo '----------------------------------'
+        echo ' Done, please reboot the server'
+        echo '----------------------------------'
+        ;;
+    8) 
+        read -p "Enter user name: " user
+        adduser $user
+        usermod -aG sudo $user
+        sed -r -i "s/#?\s*PasswordAuthentication\s+.+/PasswordAuthentication no/" /etc/ssh/sshd_config
+        sed -r -i "s/#?\s*PermitRootLogin\s+.+/PermitRootLogin no/" /etc/ssh/sshd_config
+        sed -r -i "s/#?\s*PubkeyAuthentication\s+.+/PubkeyAuthentication yes/" /etc/ssh/sshd_config
+        sed -r -i "s/#?\s*ChallengeResponseAuthentication\s+.+/ChallengeResponseAuthentication no/" /etc/ssh/sshd_config
+        # Copy SSH key from root to user
+        read -p "Are you want to copy SSH key from root to $user?" -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]
+        then
+            mkdir /home/$user/.ssh
+            cp ~/.ssh/authorized_keys /home/$user/.ssh/authorized_keys
+            chmod 600 /home/$user/.ssh/authorized_keys
+            chmod 700 /home/$user/.ssh
+            chown -R $user:$user /home/$user/.ssh
+        fi
+        # Change SSH port
+        read -p "Are you want to change SSH port?" -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]
+        then
+            read -p "Enter port (2332): " sshport
+            sed -r -i "s/#?\s*Port\s+.+/Port $sshport/" /etc/ssh/sshd_config
+            ufw allow $sshport
+            ufw delete allow OpenSSH
+        fi
+        echo '----------------------------------'
+        echo ' Done, please logout and login'
+        echo '----------------------------------'
+        /etc/init.d/ssh restart
         ;;
     0)
         ;;
