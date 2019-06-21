@@ -154,8 +154,8 @@ case $opt in
         echo "Press any key..."
         read -n 1
         apt-get -y install postfix mailutils
-        read -p "Enter root emails (comma-separated)" emails
-        echo "postmaster: root" >> /etc/aliases
+        read -p "Enter root emails (comma-separated): " emails
+        echo "postmaster: root" > /etc/aliases
         echo "root: $emails" >> /etc/aliases
         newaliases
         read -p "Are you want to send test e-mails to $emails?" -n 1 -r
@@ -230,7 +230,7 @@ case $opt in
         
         htpasswd -mbc /etc/munin/.passwd $usermonit "$passmonit"
         # Add nginx configuration
-        echo "server {" > /etc/nginx/sites-available/munin
+        echo "server {" > /etc/nginx/sites-available/monit
         read -p "Are you want to set munin and monit as default" -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]
@@ -247,7 +247,7 @@ case $opt in
         echo "        location /munin {" >> /etc/nginx/sites-available/monit
         echo "              alias /var/cache/munin/www;" >> /etc/nginx/sites-available/monit
         echo "              autoindex on;" >> /etc/nginx/sites-available/monit
-        echo "              auth_basic "Munin Statistics";" >> /etc/nginx/sites-available/monit
+        echo "              auth_basic \"Munin Statistics\";" >> /etc/nginx/sites-available/monit
         echo "              auth_basic_user_file /etc/munin/.passwd;" >> /etc/nginx/sites-available/monit
         echo "        }" >> /etc/nginx/sites-available/monit
         echo "        location /monit/ {" >> /etc/nginx/sites-available/monit
@@ -256,8 +256,10 @@ case $opt in
         echo "              proxy_pass http://127.0.0.1:2812;" >> /etc/nginx/sites-available/monit
         echo "              proxy_set_header Host \$host;" >> /etc/nginx/sites-available/monit
         echo "        }" >> /etc/nginx/sites-available/monit
+        echo "        root /var/www/html;" >> /etc/nginx/sites-available/monit
+        echo "        index index.html index.htm index.nginx-debian.html;" >> /etc/nginx/sites-available/monit
         echo "        location / {" >> /etc/nginx/sites-available/monit
-        echo "                return 404;" >> /etc/nginx/sites-available/monit
+        echo "                try_files \$uri \$uri/ =404;" >> /etc/nginx/sites-available/monit
         echo "        }" >> /etc/nginx/sites-available/monit
         echo "}" >> /etc/nginx/sites-available/monit
         ln -s /etc/nginx/sites-available/monit /etc/nginx/sites-enabled/monit
