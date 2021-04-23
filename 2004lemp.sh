@@ -55,8 +55,6 @@ case $opt in
         sed -r -i "s/.*server_tokens.*//" /etc/nginx/nginx.conf
         sed -r -i "s/.*client_max_body_size.*//" /etc/nginx/nginx.conf
         sed -r -i "s/http\s*\{/http {\n        client_max_body_size $postsize;\n        server_tokens off;\n/" /etc/nginx/nginx.conf
-        # Change MySql configuration file
-        sed -r -i "s/\[mysqld\]/[mysqld]\nsql_mode = \"STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\"\n/" /etc/mysql/mysql.conf.d/mysqld.cnf
         # Change folder permissions
         chmod 777 /var/lib/php
         chmod 777 /var/lib/nginx
@@ -101,7 +99,8 @@ case $opt in
         sitepassword=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
         # Create database
         echo "CREATE DATABASE $sitename CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;" | mysql -u root
-        echo "GRANT ALL PRIVILEGES ON $sitename.* TO $sitename@localhost IDENTIFIED BY \"$sitepassword\";" | mysql -u root
+        echo "CREATE USER $sitename@localhost IDENTIFIED BY \"$sitepassword\";" | mysql -u root
+        echo "GRANT ALL PRIVILEGES ON $sitename.* TO $sitename@localhost;" | mysql -u root
         echo "FLUSH PRIVILEGES;" | mysql -u root
         # Create files
         mkdir /var/www/$sitename
